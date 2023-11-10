@@ -2,15 +2,15 @@ var vertexShaderText = [
     'precision mediump float;',
     '',
     'attribute vec3 vertPosition;',
-    'attribute vec3 vertColor;',
-    'varying vec3 fragColor;',
+    'attribute vec2 vertTexCoord;',
+    'varying vec2 fragTexCoord;',
     'uniform mat4 mWorld;',
     'uniform mat4 mView;',
     'uniform mat4 mProj;',
     '',
     'void main()',
     '{',
-    '   fragColor = vertColor;',
+    '   fragTexCoord = vertTexCoord;',
     '   gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
     '}'
 ].join('\n');
@@ -18,10 +18,12 @@ var vertexShaderText = [
 var fragmentShaderText = [
     'precision mediump float;',
     '',
-    'varying vec3 fragColor;',
+    'varying vec2 fragTexCoord;',
+    'uniform sampler2D sampler;',
+    '',
     'void main()',
     '{',
-    'gl_FragColor = vec4(fragColor, 1.0);',
+    'gl_FragColor = texture2D(sampler, fragTexCoord);',
     '}'
 ].join('\n');
 
@@ -74,43 +76,42 @@ var initDemo = function () {
 
     //Create buffer for cube
     var boxVertices = [
-        //X, Y, Z       R, G, B
+        //X, Y, Z       U, V
         //Top
-        // Top
-        -1.0, 1.0, -1.0, 0.5, 0.5, 0.5,
-        -1.0, 1.0, 1.0, 0.5, 0.5, 0.5,
-        1.0, 1.0, 1.0, 0.5, 0.5, 0.5,
-        1.0, 1.0, -1.0, 0.5, 0.5, 0.5,
+        -1.0, 1.0, -1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Left
-        -1.0, 1.0, 1.0, 0.75, 0.25, 0.5,
-        -1.0, -1.0, 1.0, 0.75, 0.25, 0.5,
-        -1.0, -1.0, -1.0, 0.75, 0.25, 0.5,
-        -1.0, 1.0, -1.0, 0.75, 0.25, 0.5,
+        -1.0, 1.0, 1.0, 0, 0,
+        -1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 0, 1,
 
         // Right
-        1.0, 1.0, 1.0, 0.25, 0.25, 0.75,
-        1.0, -1.0, 1.0, 0.25, 0.25, 0.75,
-        1.0, -1.0, -1.0, 0.25, 0.25, 0.75,
-        1.0, 1.0, -1.0, 0.25, 0.25, 0.75,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 0, 1,
+        1.0, -1.0, -1.0, 0, 0,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Front
-        1.0, 1.0, 1.0, 1.0, 0.0, 0.15,
-        1.0, -1.0, 1.0, 1.0, 0.0, 0.15,
-        -1.0, -1.0, 1.0, 1.0, 0.0, 0.15,
-        -1.0, 1.0, 1.0, 1.0, 0.0, 0.15,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, 1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
 
         // Back
-        1.0, 1.0, -1.0, 0.0, 1.0, 0.15,
-        1.0, -1.0, -1.0, 0.0, 1.0, 0.15,
-        -1.0, -1.0, -1.0, 0.0, 1.0, 0.15,
-        -1.0, 1.0, -1.0, 0.0, 1.0, 0.15,
+        1.0, 1.0, -1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 1, 0,
 
         // Bottom
-        -1.0, -1.0, -1.0, 0.5, 0.5, 1.0,
-        -1.0, -1.0, 1.0, 0.5, 0.5, 1.0,
-        1.0, -1.0, 1.0, 0.5, 0.5, 1.0,
-        1.0, -1.0, -1.0, 0.5, 0.5, 1.0
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, -1.0, 1.0, 1, 0,
+        1.0, -1.0, 1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
     ];
 
     var boxIndices = [
@@ -152,31 +153,41 @@ var initDemo = function () {
 
     //tell the GPU how to interpret the data (in this case, vertPosition)
     var positionAttributeLocation = gl.getAttribLocation(program, 'vertPosition');
-    var colorAttributeLocation = gl.getAttribLocation(program, 'vertColor');
+    var texCoordAttributeLocation = gl.getAttribLocation(program, 'vertTexCoord');
     gl.vertexAttribPointer(
         positionAttributeLocation, //Attribute location
-        3, //number of elements per attribute, because it's a vec2
+        3, //number of elements per attribute, because it's a vec3
         gl.FLOAT, //type of elements
         gl.FALSE, //is it normalized? in this case no 
-        6 * Float32Array.BYTES_PER_ELEMENT, //size of an individual vertex. 
+        5 * Float32Array.BYTES_PER_ELEMENT, //size of an individual vertex. 
         0   //offset from the beggining ot a single vertex to this attribute
     );
 
     gl.vertexAttribPointer(
-        colorAttributeLocation, //Attribute location
-        3, //number of elements per attribute, because it's a vec2
+        texCoordAttributeLocation, //Attribute location
+        2, //number of elements per attribute, because it's a vec2
         gl.FLOAT, //type of elements
         gl.FALSE, //is it normalized? in this case no 
-        6 * Float32Array.BYTES_PER_ELEMENT, //size of an individual vertex. 
+        5 * Float32Array.BYTES_PER_ELEMENT, //size of an individual vertex. 
         3 * Float32Array.BYTES_PER_ELEMENT   //offset from the beggining ot a single vertex to this attribute
     );
 
     gl.enableVertexAttribArray(positionAttributeLocation);
-    gl.enableVertexAttribArray(colorAttributeLocation);
+    gl.enableVertexAttribArray(texCoordAttributeLocation);
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.CULL_FACE);
     gl.frontFace(gl.CCW);
     gl.cullFace(gl.BACK);
+
+    //Create texture
+    var boxTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, document.getElementById('crate-image'));
 
     gl.useProgram(program);
 
@@ -209,6 +220,10 @@ var initDemo = function () {
         gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
         gl.clearColor(0.75, 0.85, 0.8, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+        gl.activeTexture(gl.TEXTURE0);
+
         gl.drawElements(gl.TRIANGLES, boxIndices.length, gl.UNSIGNED_SHORT, 0);
         requestAnimationFrame(loop);
     };
